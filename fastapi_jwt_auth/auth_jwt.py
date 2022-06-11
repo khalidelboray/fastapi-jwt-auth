@@ -700,12 +700,12 @@ class AuthJWT(AuthConfig):
                 if self._token and self.jwt_in_headers:
                     await self._verify_jwt_in_request(self._token,'access','headers')
                 if not self._token and self.jwt_in_cookies:
-                    self._verify_and_get_jwt_in_cookies('access',self._request)
+                    await self._verify_and_get_jwt_in_cookies('access',self._request)
             else:
                 if self.jwt_in_headers:
                     await self._verify_jwt_in_request(self._token,'access','headers')
                 if self.jwt_in_cookies:
-                    self._verify_and_get_jwt_in_cookies('access',self._request)
+                    await self._verify_and_get_jwt_in_cookies('access',self._request)
 
     async def jwt_optional(
         self,
