@@ -214,7 +214,7 @@ class AuthJWT(AuthConfig):
                 "the '@AuthJWT.token_in_denylist_loader' if "
                 "authjwt_denylist_enabled is 'True'")
         verify_function = self._token_in_denylist_callback.__func__
-        if inspect.iscoroutinefunction(verify_function)
+        if inspect.iscoroutinefunction(verify_function):
             revoked = await verify_function(raw_token)
         else:
             revoked = verify_function(raw_token)
