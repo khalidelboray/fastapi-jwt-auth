@@ -707,7 +707,7 @@ class AuthJWT(AuthConfig):
                 if self.jwt_in_cookies:
                     self._verify_and_get_jwt_in_cookies('access',self._request)
 
-    def jwt_optional(
+    async def jwt_optional(
         self,
         auth_from: str = "request",
         token: Optional[str] = None,
