@@ -15,7 +15,7 @@ from fastapi_jwt_auth.exceptions import (
     FreshTokenRequired
 )
 import inspect
-import asyncio
+
 
 class AuthJWT(AuthConfig):
     def __init__(self,req: Request = None, res: Response = None):
@@ -201,7 +201,7 @@ class AuthJWT(AuthConfig):
         """
         return self._token_in_denylist_callback is not None
 
-    def _check_token_is_revoked(self, raw_token: Dict[str,Union[str,int,bool]]) -> None:
+    async def _check_token_is_revoked(self, raw_token: Dict[str,Union[str,int,bool]]) -> None:
         """
         Ensure that AUTHJWT_DENYLIST_ENABLED is true and callback regulated, and then
         call function denylist callback with passing decode JWT, if true
@@ -488,7 +488,7 @@ class AuthJWT(AuthConfig):
                 domain=self._cookie_domain
             )
 
-    def _verify_and_get_jwt_optional_in_cookies(
+    async def _verify_and_get_jwt_optional_in_cookies(
         self,
         request: Union[Request,WebSocket],
         csrf_token: Optional[str] = None,
@@ -515,7 +515,7 @@ class AuthJWT(AuthConfig):
 
         # set token from cookie and verify jwt
         self._token = cookie
-        self._verify_jwt_optional_in_request(self._token)
+        await self._verify_jwt_optional_in_request(self._token)
 
         decoded_token = self.get_raw_jwt()
 
@@ -526,7 +526,7 @@ class AuthJWT(AuthConfig):
                 if not hmac.compare_digest(csrf_token,decoded_token['csrf']):
                     raise CSRFError(status_code=401,message="CSRF double submit tokens do not match")
 
-    def _verify_and_get_jwt_in_cookies(
+    async def _verify_and_get_jwt_in_cookies(
         self,
         type_token: str,
         request: Union[Request,WebSocket],
@@ -568,7 +568,7 @@ class AuthJWT(AuthConfig):
 
         # set token from cookie and verify jwt
         self._token = cookie
-        self._verify_jwt_in_request(self._token,type_token,'cookies',fresh)
+        await self._verify_jwt_in_request(self._token,type_token,'cookies',fresh)
 
         decoded_token = self.get_raw_jwt()
 
@@ -579,18 +579,18 @@ class AuthJWT(AuthConfig):
                 if not hmac.compare_digest(csrf_token,decoded_token['csrf']):
                     raise CSRFError(status_code=401,message="CSRF double submit tokens do not match")
 
-    def _verify_jwt_optional_in_request(self,token: str) -> None:
+    async def _verify_jwt_optional_in_request(self,token: str) -> None:
         """
         Optionally check if this request has a valid access token
 
         :param token: The encoded JWT
         """
-        if token: self._verifying_token(token)
+        if token: await self._verifying_token(token)
 
         if token and self.get_raw_jwt(token)['type'] != 'access':
             raise AccessTokenRequired(status_code=422,message="Only access tokens are allowed")
 
-    def _verify_jwt_in_request(
+    async def _verify_jwt_in_request(
         self,
         token: str,
         type_token: str,
@@ -618,7 +618,7 @@ class AuthJWT(AuthConfig):
 
         # verify jwt
         issuer = self._decode_issuer if type_token == 'access' else None
-        self._verifying_token(token,issuer)
+        await self._verifying_token(token,issuer)
 
         if self.get_raw_jwt(token)['type'] != type_token:
             msg = "Only {} tokens are allowed".format(type_token)
@@ -630,7 +630,7 @@ class AuthJWT(AuthConfig):
         if fresh and not self.get_raw_jwt(token)['fresh']:
             raise FreshTokenRequired(status_code=401,message="Fresh token required")
 
-    def _verifying_token(self,encoded_token: str, issuer: Optional[str] = None) -> None:
+    async def _verifying_token(self,encoded_token: str, issuer: Optional[str] = None) -> None:
         """
         Verified token and check if token is revoked
 
@@ -639,7 +639,7 @@ class AuthJWT(AuthConfig):
         """
         raw_token = self._verified_token(encoded_token,issuer)
         if raw_token['type'] in self._denylist_token_checks:
-            self._check_token_is_revoked(raw_token)
+            await self._check_token_is_revoked(raw_token)
 
     def _verified_token(self,encoded_token: str, issuer: Optional[str] = None) -> Dict[str,Union[str,int,bool]]:
         """
@@ -674,7 +674,7 @@ class AuthJWT(AuthConfig):
         except Exception as err:
             raise JWTDecodeError(status_code=422,message=str(err))
 
-    def jwt_required(
+    async def jwt_required(
         self,
         auth_from: str = "request",
         token: Optional[str] = None,
@@ -693,17 +693,17 @@ class AuthJWT(AuthConfig):
         """
         if auth_from == "websocket":
             if websocket: self._verify_and_get_jwt_in_cookies('access',websocket,csrf_token)
-            else: self._verify_jwt_in_request(token,'access','websocket')
+            else: await self._verify_jwt_in_request(token,'access','websocket')
 
         if auth_from == "request":
             if len(self._token_location) == 2:
                 if self._token and self.jwt_in_headers:
-                    self._verify_jwt_in_request(self._token,'access','headers')
+                    await self._verify_jwt_in_request(self._token,'access','headers')
                 if not self._token and self.jwt_in_cookies:
                     self._verify_and_get_jwt_in_cookies('access',self._request)
             else:
                 if self.jwt_in_headers:
-                    self._verify_jwt_in_request(self._token,'access','headers')
+                    await self._verify_jwt_in_request(self._token,'access','headers')
                 if self.jwt_in_cookies:
                     self._verify_and_get_jwt_in_cookies('access',self._request)
 
@@ -727,22 +727,22 @@ class AuthJWT(AuthConfig):
                            its must be passing csrf_token manually and can achieve by Query Url or Path
         """
         if auth_from == "websocket":
-            if websocket: self._verify_and_get_jwt_optional_in_cookies(websocket,csrf_token)
-            else: self._verify_jwt_optional_in_request(token)
+            if websocket: await self._verify_and_get_jwt_optional_in_cookies(websocket,csrf_token)
+            else: await self._verify_jwt_optional_in_request(token)
 
         if auth_from == "request":
             if len(self._token_location) == 2:
                 if self._token and self.jwt_in_headers:
-                    self._verify_jwt_optional_in_request(self._token)
+                    await self._verify_jwt_optional_in_request(self._token)
                 if not self._token and self.jwt_in_cookies:
-                    self._verify_and_get_jwt_optional_in_cookies(self._request)
+                    await self._verify_and_get_jwt_optional_in_cookies(self._request)
             else:
                 if self.jwt_in_headers:
-                    self._verify_jwt_optional_in_request(self._token)
+                    await self._verify_jwt_optional_in_request(self._token)
                 if self.jwt_in_cookies:
-                    self._verify_and_get_jwt_optional_in_cookies(self._request)
+                    await self._verify_and_get_jwt_optional_in_cookies(self._request)
 
-    def jwt_refresh_token_required(
+    async def jwt_refresh_token_required(
         self,
         auth_from: str = "request",
         token: Optional[str] = None,
@@ -761,21 +761,21 @@ class AuthJWT(AuthConfig):
         """
         if auth_from == "websocket":
             if websocket: self._verify_and_get_jwt_in_cookies('refresh',websocket,csrf_token)
-            else: self._verify_jwt_in_request(token,'refresh','websocket')
+            else: await self._verify_jwt_in_request(token,'refresh','websocket')
 
         if auth_from == "request":
             if len(self._token_location) == 2:
                 if self._token and self.jwt_in_headers:
-                    self._verify_jwt_in_request(self._token,'refresh','headers')
+                    await self._verify_jwt_in_request(self._token,'refresh','headers')
                 if not self._token and self.jwt_in_cookies:
-                    self._verify_and_get_jwt_in_cookies('refresh',self._request)
+                    await self._verify_and_get_jwt_in_cookies('refresh',self._request)
             else:
                 if self.jwt_in_headers:
-                    self._verify_jwt_in_request(self._token,'refresh','headers')
+                    await self._verify_jwt_in_request(self._token,'refresh','headers')
                 if self.jwt_in_cookies:
-                    self._verify_and_get_jwt_in_cookies('refresh',self._request)
+                    await self._verify_and_get_jwt_in_cookies('refresh',self._request)
 
-    def fresh_jwt_required(
+    async def fresh_jwt_required(
         self,
         auth_from: str = "request",
         token: Optional[str] = None,
@@ -794,19 +794,19 @@ class AuthJWT(AuthConfig):
         """
         if auth_from == "websocket":
             if websocket: self._verify_and_get_jwt_in_cookies('access',websocket,csrf_token,True)
-            else: self._verify_jwt_in_request(token,'access','websocket',True)
+            else: await self._verify_jwt_in_request(token,'access','websocket',True)
 
         if auth_from == "request":
             if len(self._token_location) == 2:
                 if self._token and self.jwt_in_headers:
-                    self._verify_jwt_in_request(self._token,'access','headers',True)
+                    await self._verify_jwt_in_request(self._token,'access','headers',True)
                 if not self._token and self.jwt_in_cookies:
-                    self._verify_and_get_jwt_in_cookies('access',self._request,fresh=True)
+                    await self._verify_and_get_jwt_in_cookies('access',self._request,fresh=True)
             else:
                 if self.jwt_in_headers:
-                    self._verify_jwt_in_request(self._token,'access','headers',True)
+                    await self._verify_jwt_in_request(self._token,'access','headers',True)
                 if self.jwt_in_cookies:
-                    self._verify_and_get_jwt_in_cookies('access',self._request,fresh=True)
+                    await self._verify_and_get_jwt_in_cookies('access',self._request,fresh=True)
 
     def get_raw_jwt(self,encoded_token: Optional[str] = None) -> Optional[Dict[str,Union[str,int,bool]]]:
         """
