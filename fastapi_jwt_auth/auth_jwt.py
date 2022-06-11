@@ -15,6 +15,7 @@ from fastapi_jwt_auth.exceptions import (
     FreshTokenRequired
 )
 import inspect
+import asyncio
 
 class AuthJWT(AuthConfig):
     def __init__(self,req: Request = None, res: Response = None):
@@ -215,7 +216,7 @@ class AuthJWT(AuthConfig):
                 "authjwt_denylist_enabled is 'True'")
         verify_function = self._token_in_denylist_callback.__func__
         if inspect.iscoroutinefunction(verify_function):
-            revoked = await verify_function(raw_token)
+            revoked = asyncio.run(verify_function(raw_token))
         else:
             revoked = verify_function(raw_token)
         if revoked:
