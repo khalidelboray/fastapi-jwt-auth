@@ -14,6 +14,7 @@ from fastapi_jwt_auth.exceptions import (
     RefreshTokenRequired,
     FreshTokenRequired
 )
+import inspect
 
 class AuthJWT(AuthConfig):
     def __init__(self,req: Request = None, res: Response = None):
@@ -212,8 +213,12 @@ class AuthJWT(AuthConfig):
             raise RuntimeError("A token_in_denylist_callback must be provided via "
                 "the '@AuthJWT.token_in_denylist_loader' if "
                 "authjwt_denylist_enabled is 'True'")
-
-        if self._token_in_denylist_callback.__func__(raw_token):
+        verify_function = self._token_in_denylist_callback.__func__
+        if inspect.iscoroutinefunction(verify_function)
+            revoked = await verify_function(raw_token)
+        else:
+            revoked = verify_function(raw_token)
+        if revoked:
             raise RevokedTokenError(status_code=401,message="Token has been revoked")
 
     def _get_expired_time(
